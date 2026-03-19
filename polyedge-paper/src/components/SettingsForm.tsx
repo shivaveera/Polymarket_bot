@@ -1,0 +1,231 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Settings } from '@/types';
+
+export function SettingsForm() {
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/settings/get')
+      .then(r => r.json())
+      .then(setSettings)
+      .catch(console.error);
+  }, []);
+
+  async function save(updates: Partial<Settings>) {
+    setSaving(true);
+    try {
+      await fetch('/api/settings/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      setSettings(prev => prev ? { ...prev, ...updates } : prev);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error('Save failed:', e);
+    }
+    setSaving(false);
+  }
+
+  if (!settings) return <div className="text-gray-500">Loading settings...</div>;
+
+  return (
+    <div className="space-y-6">
+      {saved && (
+        <div className="bg-green-900/50 text-green-300 px-4 py-2 rounded text-sm">
+          Settings saved
+        </div>
+      )}
+
+      {/* Master Toggle */}
+      <div className="card">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold">Trading Enabled</div>
+            <div className="text-sm text-gray-400">Master on/off switch</div>
+          </div>
+          <button
+            onClick={() => save({ trading_enabled: !settings.trading_enabled })}
+            className={`px-6 py-3 rounded-lg font-bold text-lg ${
+              settings.trading_enabled
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-red-600 hover:bg-red-700'
+            }`}
+          >
+            {settings.trading_enabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </div>
+
+      {/* Bankroll */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Position Sizing</h3>
+
+        <SliderField
+          label="Bankroll"
+          value={settings.bankroll}
+          min={1} max={100} step={1}
+          format={v => `$${v}`}
+          onChange={v => save({ bankroll: v })}
+        />
+        <SliderField
+          label="Max Bet"
+          value={settings.max_bet}
+          min={0.5} max={10} step={0.5}
+          format={v => `$${v.toFixed(2)}`}
+          onChange={v => save({ max_bet: v })}
+        />
+        <SliderField
+          label="Max Simultaneous Trades"
+          value={settings.max_simultaneous}
+          min={1} max={10} step={1}
+          onChange={v => save({ max_simultaneous: v })}
+        />
+        <SliderField
+          label="Max Trades/Hour"
+          value={settings.max_trades_per_hour}
+          min={5} max={100} step={5}
+          onChange={v => save({ max_trades_per_hour: v })}
+        />
+      </div>
+
+      {/* Scoring */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Signal Thresholds</h3>
+
+        <SliderField
+          label="Entry Price Max"
+          value={settings.entry_price_max}
+          min={0.55} max={0.95} step={0.05}
+          format={v => `$${v.toFixed(2)}`}
+          onChange={v => save({ entry_price_max: v })}
+        />
+        <SliderField
+          label="Tier 1 Threshold (Auto-Trade)"
+          value={settings.tier1_threshold}
+          min={20} max={35} step={1}
+          format={v => `${v}/35`}
+          onChange={v => save({ tier1_threshold: v })}
+        />
+        <SliderField
+          label="Tier 2 Threshold (AI Review)"
+          value={settings.tier2_threshold}
+          min={10} max={25} step={1}
+          format={v => `${v}/35`}
+          onChange={v => save({ tier2_threshold: v })}
+        />
+      </div>
+
+      {/* AI */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">AI Validation</h3>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm">AI Enabled</span>
+          <button
+            onClick={() => save({ ai_enabled: !settings.ai_enabled })}
+            className={`px-3 py-1 rounded text-sm ${
+              settings.ai_enabled ? 'bg-blue-600' : 'bg-gray-700'
+            }`}
+          >
+            {settings.ai_enabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+
+        {settings.ai_enabled && (
+          <SliderField
+            label="AI Confidence Min"
+            value={settings.ai_confidence_min}
+            min={40} max={90} step={5}
+            format={v => `${v}%`}
+            onChange={v => save({ ai_confidence_min: v })}
+          />
+        )}
+      </div>
+
+      {/* Timeframes */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Timeframes</h3>
+        <div className="flex gap-3">
+          {[5, 15].map(tf => (
+            <button
+              key={tf}
+              onClick={() => {
+                const current = settings.timeframes;
+                const next = current.includes(tf)
+                  ? current.filter(t => t !== tf)
+                  : [...current, tf];
+                if (next.length > 0) save({ timeframes: next });
+              }}
+              className={`px-4 py-2 rounded text-sm ${
+                settings.timeframes.includes(tf) ? 'bg-blue-600' : 'bg-gray-700'
+              }`}
+            >
+              {tf}m
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Fees */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Simulation Fees</h3>
+        <SliderField
+          label="Simulated Gas Fee"
+          value={settings.sim_gas_fee}
+          min={0} max={0.05} step={0.001}
+          format={v => `$${v.toFixed(3)}`}
+          onChange={v => save({ sim_gas_fee: v })}
+        />
+        <SliderField
+          label="Taker Fee Rate"
+          value={settings.sim_taker_fee_rate}
+          min={0} max={0.05} step={0.005}
+          format={v => `${(v * 100).toFixed(1)}%`}
+          onChange={v => save({ sim_taker_fee_rate: v })}
+        />
+      </div>
+
+      {saving && <div className="text-gray-400 text-sm">Saving...</div>}
+    </div>
+  );
+}
+
+function SliderField({
+  label, value, min, max, step, format, onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format?: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  const [local, setLocal] = useState(value);
+
+  useEffect(() => { setLocal(value); }, [value]);
+
+  return (
+    <div>
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-gray-400">{label}</span>
+        <span className="font-mono">{format ? format(local) : local}</span>
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step}
+        value={local}
+        onChange={e => setLocal(parseFloat(e.target.value))}
+        onMouseUp={() => onChange(local)}
+        onTouchEnd={() => onChange(local)}
+        className="w-full accent-blue-500"
+      />
+    </div>
+  );
+}
