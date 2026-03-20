@@ -1,0 +1,20 @@
+{
+  "buildCommand": "cd polyedge-paper && npm run build",
+  "outputDirectory": "polyedge-paper/.next",
+  "installCommand": "cd polyedge-paper && npm install",
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/tick",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/resolve",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/research",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
