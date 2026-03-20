@@ -6,15 +6,15 @@
   "crons": [
     {
       "path": "/api/cron/tick",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/resolve",
-      "schedule": "30 * * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/research",
-      "schedule": "0 6 * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }
