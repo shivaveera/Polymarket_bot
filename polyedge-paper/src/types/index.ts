@@ -21,6 +21,18 @@ export interface Settings {
   telegram_chat_id: string;
   discord_enabled: boolean;
   discord_webhook_url: string;
+  // Pre-order settings
+  preorder_enabled: boolean;
+  preorder_before_seconds: number;
+  preorder_skip_if_clear: number;
+  // Early exit settings
+  early_exit_enabled: boolean;
+  danger_price: number;
+  danger_time_minutes: number;
+  danger_time_price: number;
+  no_exit_final_seconds: number;
+  // Circuit breaker (enhanced)
+  circuit_breaker_enabled: boolean;
 }
 
 export interface Candle {
@@ -80,7 +92,7 @@ export interface Trade {
   contracts: number;
   tier: string;
   confidence_score: number;
-  status: 'open' | 'won' | 'lost';
+  status: 'open' | 'won' | 'lost' | 'exited_early';
   resolution: string;
   close_price: number;
   pnl_gross: number;
@@ -98,6 +110,30 @@ export interface Trade {
   ai_decision: string;
   ai_confidence: number;
   ai_reasoning: string;
+  // Early exit fields
+  exit_reason: string;
+  exit_price: number;
+  savings_vs_hold: number;
+  // Maker order fields
+  is_maker: boolean;
+  maker_rebate: number;
+}
+
+export interface PreOrder {
+  id: string;
+  slug: string;
+  market_id: string;
+  side: 'YES';
+  limit_price: number;
+  amount: number;
+  window_start: string;
+  window_end: string;
+  status: 'pending' | 'filled' | 'cancelled' | 'expired';
+  fill_price: number;
+  is_maker: boolean;
+  signal_score: number;
+  placed_at: string;
+  filled_at: string;
 }
 
 export interface Observation {
@@ -125,6 +161,8 @@ export interface Observation {
   trade_id: string;
   skip_reason: string;
   market_outcome: string;
+  current_window_yes_price: number;
+  current_window_minutes_left: number;
 }
 
 export interface DailyStats {
@@ -153,6 +191,16 @@ export interface SimulatedTradeResult {
   pnlGross: number;
   pnlNet: number;
   won: boolean;
+  isMaker: boolean;
+  makerRebate: number;
+}
+
+export interface CircuitBreakerStatus {
+  triggered: boolean;
+  reason: string | null;
+  consecutiveLosses: number;
+  drawdownPct: number;
+  peakBankroll: number;
 }
 
 export interface AIValidation {

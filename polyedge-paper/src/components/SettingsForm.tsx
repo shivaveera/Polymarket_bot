@@ -148,6 +148,98 @@ export function SettingsForm() {
         )}
       </div>
 
+      {/* Pre-Orders (Maker) */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Pre-Orders (Maker)</h3>
+        <div className="text-xs text-gray-400 mb-2">
+          Place limit orders on the NEXT window before it opens. 0% maker fee + daily rebate.
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm">Pre-Orders Enabled</span>
+          <button
+            onClick={() => save({ preorder_enabled: !settings.preorder_enabled })}
+            className={`px-3 py-1 rounded text-sm ${
+              settings.preorder_enabled ? 'bg-blue-600' : 'bg-gray-700'
+            }`}
+          >
+            {settings.preorder_enabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+
+        {settings.preorder_enabled && (
+          <>
+            <SliderField
+              label="Place Before (seconds)"
+              value={settings.preorder_before_seconds}
+              min={60} max={300} step={30}
+              format={v => `${v}s`}
+              onChange={v => save({ preorder_before_seconds: v })}
+            />
+            <SliderField
+              label="Skip if Current Window YES >"
+              value={settings.preorder_skip_if_clear}
+              min={0.70} max={0.95} step={0.05}
+              format={v => `$${v.toFixed(2)}`}
+              onChange={v => save({ preorder_skip_if_clear: v })}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Early Exit */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Early Exit</h3>
+        <div className="text-xs text-gray-400 mb-2">
+          Exit trades early when YES price deteriorates, capping losses at $0.30-0.50 instead of ~$2.00.
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm">Early Exit Enabled</span>
+          <button
+            onClick={() => save({ early_exit_enabled: !settings.early_exit_enabled })}
+            className={`px-3 py-1 rounded text-sm ${
+              settings.early_exit_enabled ? 'bg-blue-600' : 'bg-gray-700'
+            }`}
+          >
+            {settings.early_exit_enabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+
+        {settings.early_exit_enabled && (
+          <>
+            <SliderField
+              label="Danger Price (exit if YES below)"
+              value={settings.danger_price}
+              min={0.20} max={0.45} step={0.01}
+              format={v => `$${v.toFixed(2)}`}
+              onChange={v => save({ danger_price: v })}
+            />
+            <SliderField
+              label="Danger Time (minutes)"
+              value={settings.danger_time_minutes}
+              min={2} max={10} step={1}
+              format={v => `${v}m`}
+              onChange={v => save({ danger_time_minutes: v })}
+            />
+            <SliderField
+              label="Danger Time Price"
+              value={settings.danger_time_price}
+              min={0.40} max={0.50} step={0.01}
+              format={v => `$${v.toFixed(2)}`}
+              onChange={v => save({ danger_time_price: v })}
+            />
+            <SliderField
+              label="No Exit Final Seconds"
+              value={settings.no_exit_final_seconds}
+              min={30} max={120} step={15}
+              format={v => `${v}s`}
+              onChange={v => save({ no_exit_final_seconds: v })}
+            />
+          </>
+        )}
+      </div>
+
       {/* Timeframes */}
       <div className="card space-y-4">
         <h3 className="font-semibold">Timeframes</h3>
@@ -178,19 +270,36 @@ export function SettingsForm() {
         <div className="text-xs text-gray-400 mb-2">
           Auto-pauses trading on loss streaks or drawdown. Sends alert via Telegram/Discord.
         </div>
-        <SliderField
-          label="Max Consecutive Losses"
-          value={settings.max_consecutive_losses}
-          min={2} max={10} step={1}
-          onChange={v => save({ max_consecutive_losses: v })}
-        />
-        <SliderField
-          label="Max Drawdown %"
-          value={settings.max_drawdown_pct}
-          min={5} max={50} step={5}
-          format={v => `${v}%`}
-          onChange={v => save({ max_drawdown_pct: v })}
-        />
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm">Circuit Breaker Enabled</span>
+          <button
+            onClick={() => save({ circuit_breaker_enabled: !settings.circuit_breaker_enabled })}
+            className={`px-3 py-1 rounded text-sm ${
+              settings.circuit_breaker_enabled ? 'bg-blue-600' : 'bg-gray-700'
+            }`}
+          >
+            {settings.circuit_breaker_enabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+
+        {settings.circuit_breaker_enabled && (
+          <>
+            <SliderField
+              label="Max Consecutive Losses"
+              value={settings.max_consecutive_losses}
+              min={2} max={10} step={1}
+              onChange={v => save({ max_consecutive_losses: v })}
+            />
+            <SliderField
+              label="Max Drawdown %"
+              value={settings.max_drawdown_pct}
+              min={5} max={50} step={5}
+              format={v => `${v}%`}
+              onChange={v => save({ max_drawdown_pct: v })}
+            />
+          </>
+        )}
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Peak Bankroll</span>
           <span className="font-mono">${settings.peak_bankroll.toFixed(2)}</span>

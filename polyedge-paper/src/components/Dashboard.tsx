@@ -26,7 +26,7 @@ interface StatsData {
     contracts: number;
     tier: string;
     confidence_score: number;
-    status: 'open' | 'won' | 'lost';
+    status: 'open' | 'won' | 'lost' | 'exited_early';
     resolution: string;
     close_price: number;
     pnl_gross: number;
@@ -44,14 +44,21 @@ interface StatsData {
     ai_decision: string;
     ai_confidence: number;
     ai_reasoning: string;
+    exit_reason: string;
+    exit_price: number;
+    savings_vs_hold: number;
+    is_maker: boolean;
+    maker_rebate: number;
   }>;
   allTime: {
     totalTrades: number;
     won: number;
     lost: number;
+    earlyExits: number;
     winRate: number;
     pnl: number;
     fees: number;
+    savings: number;
   };
   today: {
     trades: number;
@@ -90,7 +97,7 @@ interface StatsData {
     contracts: number;
     tier: string;
     confidence_score: number;
-    status: 'open' | 'won' | 'lost';
+    status: 'open' | 'won' | 'lost' | 'exited_early';
     resolution: string;
     close_price: number;
     pnl_gross: number;
@@ -108,7 +115,19 @@ interface StatsData {
     ai_decision: string;
     ai_confidence: number;
     ai_reasoning: string;
+    exit_reason: string;
+    exit_price: number;
+    savings_vs_hold: number;
+    is_maker: boolean;
+    maker_rebate: number;
   }>;
+  circuitBreaker: {
+    triggered: boolean;
+    reason: string | null;
+    consecutiveLosses: number;
+    drawdownPct: number;
+    peakBankroll: number;
+  };
 }
 
 export function Dashboard() {
@@ -174,6 +193,41 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
+      {/* Circuit Breaker Banner */}
+      {stats.circuitBreaker?.triggered && (
+        <div className="bg-red-900/60 border border-red-700 text-red-200 px-4 py-3 rounded-lg">
+          <div className="font-bold text-red-100">TRADING PAUSED</div>
+          <div className="text-sm mt-1">{stats.circuitBreaker.reason}</div>
+          <div className="text-xs text-red-300 mt-1">
+            Reset trading in Settings to resume.
+          </div>
+        </div>
+      )}
+
+      {/* Circuit Breaker Status Badges */}
+      {stats.circuitBreaker && !stats.circuitBreaker.triggered && (
+        <div className="flex gap-2">
+          {stats.circuitBreaker.consecutiveLosses > 0 && (
+            <span className={`text-xs px-2 py-1 rounded ${
+              stats.circuitBreaker.consecutiveLosses >= 2
+                ? 'bg-yellow-900/50 text-yellow-300'
+                : 'bg-gray-800 text-gray-400'
+            }`}>
+              Loss streak: {stats.circuitBreaker.consecutiveLosses}
+            </span>
+          )}
+          {stats.circuitBreaker.drawdownPct > 0 && (
+            <span className={`text-xs px-2 py-1 rounded ${
+              stats.circuitBreaker.drawdownPct >= 10
+                ? 'bg-yellow-900/50 text-yellow-300'
+                : 'bg-gray-800 text-gray-400'
+            }`}>
+              Drawdown: {stats.circuitBreaker.drawdownPct}%
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Dashboard</h1>
         <BotControls enabled={stats.tradingEnabled} onToggle={toggleTrading} />
@@ -194,6 +248,22 @@ export function Dashboard() {
           <div className="text-sm text-gray-400">total</div>
         </div>
       </div>
+
+      {/* Early Exit / Savings Stats */}
+      {(stats.allTime.earlyExits > 0 || stats.allTime.savings > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="card">
+            <div className="text-sm text-gray-400">Early Exits</div>
+            <div className="text-2xl font-bold text-yellow-400">{stats.allTime.earlyExits}</div>
+            <div className="text-sm text-gray-400">trades exited early</div>
+          </div>
+          <div className="card">
+            <div className="text-sm text-gray-400">Saved by Exit</div>
+            <div className="text-2xl font-bold text-green-400">${stats.allTime.savings.toFixed(2)}</div>
+            <div className="text-sm text-gray-400">vs holding to resolution</div>
+          </div>
+        </div>
+      )}
 
       <LiveSignals signals={signalData} />
       <ActiveTrades trades={stats.openTrades} />

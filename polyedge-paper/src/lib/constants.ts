@@ -21,6 +21,18 @@ export const DEFAULT_SETTINGS = {
   telegram_chat_id: '',
   discord_enabled: false,
   discord_webhook_url: '',
+  // Pre-order settings
+  preorder_enabled: true,
+  preorder_before_seconds: 180,
+  preorder_skip_if_clear: 0.90,
+  // Early exit settings
+  early_exit_enabled: true,
+  danger_price: 0.35,
+  danger_time_minutes: 5,
+  danger_time_price: 0.48,
+  no_exit_final_seconds: 60,
+  // Circuit breaker (enhanced)
+  circuit_breaker_enabled: true,
 };
 
 export const SHEETS = {
@@ -30,6 +42,7 @@ export const SHEETS = {
   DAILY_STATS: 'daily_stats',
   SIGNAL_WEIGHTS: 'signal_weights',
   CANDLES: 'candles',
+  PREORDERS: 'preorders',
 } as const;
 
 export const TRADE_HEADERS = [
@@ -39,6 +52,7 @@ export const TRADE_HEADERS = [
   'pnl_gross', 'taker_fee', 'gas_fee', 'pnl_net', 'bankroll_after',
   'btc_price', 'rsi7', 'momentum_5m', 'adx', 'volume_ratio', 'chop',
   'regime', 'ai_decision', 'ai_confidence', 'ai_reasoning',
+  'exit_reason', 'exit_price', 'savings_vs_hold', 'is_maker', 'maker_rebate',
 ];
 
 export const OBSERVATION_HEADERS = [
@@ -46,6 +60,7 @@ export const OBSERVATION_HEADERS = [
   'yes_price', 'no_price', 'btc_price', 'rsi7', 'momentum_1m', 'momentum_5m',
   'adx', 'volume_ratio', 'bb_width', 'vwap_distance', 'chop', 'absorption',
   'score', 'tier', 'traded', 'trade_id', 'skip_reason', 'market_outcome',
+  'current_window_yes_price', 'current_window_minutes_left',
 ];
 
 export const DAILY_STATS_HEADERS = [
@@ -61,6 +76,12 @@ export const SIGNAL_WEIGHT_HEADERS = [
 export const CANDLE_HEADERS = [
   'openTime', 'open', 'high', 'low', 'close', 'volume', 'closeTime',
   'rsi7', 'adx', 'momentum1m', 'momentum5m', 'volumeRatio', 'bbWidth', 'vwapDistance',
+];
+
+export const PREORDER_HEADERS = [
+  'id', 'slug', 'market_id', 'side', 'limit_price', 'amount',
+  'window_start', 'window_end', 'status', 'fill_price',
+  'is_maker', 'signal_score', 'placed_at', 'filled_at',
 ];
 
 export const BINANCE_API = 'https://api.binance.com';

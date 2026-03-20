@@ -4,14 +4,24 @@ export interface ScoreBreakdown {
   total: number;
   tier: 'TIER1' | 'TIER2' | 'TIER3';
   components: Record<string, number>;
+  conflicts: string[];
+  confirmations: string[];
 }
 
-export function scoreSignals(signals: Signals, settings: Settings): ScoreBreakdown {
+export function scoreSignals(
+  signals: Signals,
+  settings: Settings,
+  windowContext?: {
+    currentWindowYesPrice?: number;
+    currentWindowMinutesLeft?: number;
+  }
+): ScoreBreakdown {
   const components: Record<string, number> = {};
+  const conflicts: string[] = [];
+  const confirmations: string[] = [];
   let total = 0;
 
   // RSI(7) momentum signal: 0-7 points
-  // Best when RSI is between 55-75 (bullish momentum, not overbought)
   if (signals.rsi7 >= 55 && signals.rsi7 <= 75) {
     const rsiScore = Math.round(((signals.rsi7 - 55) / 20) * 7);
     components.rsi7 = Math.min(rsiScore, 7);
@@ -90,6 +100,46 @@ export function scoreSignals(signals: Signals, settings: Settings): ScoreBreakdo
     components.chop = 0;
   }
 
+  // Current window signal adjustment
+  if (windowContext?.currentWindowYesPrice !== undefined &&
+      windowContext?.currentWindowMinutesLeft !== undefined) {
+
+    const cwYes = windowContext.currentWindowYesPrice;
+    const cwMinLeft = windowContext.currentWindowMinutesLeft;
+
+    // STRONG mean-reversion signal:
+    // Current window YES > 0.95 means BTC moved hard up
+    if (cwYes > 0.95) {
+      const penalty = -5;
+      components.currentWindowSignal = penalty;
+      total += penalty;
+      conflicts.push(
+        `Current window near-certain YES (${(cwYes * 100).toFixed(0)}%) — strong mean reversion risk`
+      );
+    }
+    // If current window is nearly decided (YES > 0.85 with < 5 min left)
+    else if (cwYes > 0.85 && cwMinLeft < 5) {
+      const penalty = -3;
+      components.currentWindowSignal = penalty;
+      total += penalty;
+      conflicts.push(
+        `Current window YES at ${(cwYes * 100).toFixed(0)}% — mean reversion risk for next window`
+      );
+    }
+    // If current window is nearly decided NO (YES < 0.15 with < 5 min left)
+    // BTC just dropped — bounce/recovery potential (slightly bullish for YES)
+    else if (cwYes < 0.15 && cwMinLeft < 5) {
+      const bonus = 1;
+      components.currentWindowSignal = bonus;
+      total += bonus;
+      confirmations.push(
+        `Current window bearish resolution — bounce potential for next window`
+      );
+    } else {
+      components.currentWindowSignal = 0;
+    }
+  }
+
   total = Math.max(0, Math.min(35, total));
 
   // Determine tier
@@ -102,5 +152,5 @@ export function scoreSignals(signals: Signals, settings: Settings): ScoreBreakdo
     tier = 'TIER3';
   }
 
-  return { total, tier, components };
+  return { total, tier, components, conflicts, confirmations };
 }

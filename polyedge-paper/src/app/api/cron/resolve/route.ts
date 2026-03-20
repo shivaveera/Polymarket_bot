@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkMarketResolution } from '@/lib/polymarket';
+import { checkMarketResolution, fetchBTCMarkets } from '@/lib/polymarket';
 import { simulateResolution } from '@/lib/simulator';
 import { getSettings, getOpenTrades, updateTradeResolution, updateSettings } from '@/lib/sheets';
 import { sendTradeNotification } from '@/lib/notifications';
+import { checkEarlyExit, simulateEarlyExit } from '@/lib/earlyexit';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 55;
@@ -21,10 +22,91 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: 'ok', message: 'No open trades' });
     }
 
+    // Fetch current markets for early exit price checks
+    let activeMarkets: Awaited<ReturnType<typeof fetchBTCMarkets>> = [];
+    if (settings.early_exit_enabled) {
+      try {
+        activeMarkets = await fetchBTCMarkets();
+      } catch {
+        // If we can't fetch markets, skip early exit checks
+      }
+    }
+
     const results: { tradeId: string; market: string; status: string; pnl?: number }[] = [];
     let bankroll = settings.bankroll;
 
     for (const { trade, rowIndex } of openTrades) {
+      // ===== EARLY EXIT CHECK =====
+      if (settings.early_exit_enabled) {
+        const currentMarket = activeMarkets.find(m => m.id === trade.market_id);
+        if (currentMarket) {
+          const secondsSinceEntry = (Date.now() - new Date(trade.timestamp).getTime()) / 1000;
+          const minutesToResolution = (new Date(trade.end_time).getTime() - Date.now()) / 60000;
+
+          const exitCheck = checkEarlyExit({
+            entryPrice: trade.entry_price,
+            currentYesPrice: currentMarket.yesPrice,
+            secondsSinceEntry,
+            minutesToResolution,
+            settings,
+          });
+
+          if (exitCheck.shouldExit) {
+            // Simulate the early exit
+            const exitResult = simulateEarlyExit({
+              entryPrice: trade.entry_price,
+              sellPrice: exitCheck.currentPrice,
+              betAmount: trade.amount_usd,
+              settings,
+            });
+
+            // Update bankroll: return bet amount + net PnL from early exit
+            bankroll += trade.amount_usd + exitResult.pnlNet;
+
+            await updateTradeResolution(rowIndex, {
+              status: 'exited_early',
+              resolution: 'EARLY_EXIT',
+              close_price: exitCheck.currentPrice,
+              pnl_gross: exitResult.pnlNet + exitResult.takerFee + exitResult.gasFee,
+              taker_fee: exitResult.takerFee,
+              gas_fee: exitResult.gasFee,
+              pnl_net: exitResult.pnlNet,
+              bankroll_after: Math.round(bankroll * 100) / 100,
+              exit_reason: exitCheck.reason,
+              exit_price: exitCheck.currentPrice,
+              savings_vs_hold: Math.round(exitCheck.savingsVsHold * 100) / 100,
+            });
+
+            // Send notification for early exit
+            const exitedTrade = {
+              ...trade,
+              status: 'exited_early' as const,
+              resolution: 'EARLY_EXIT',
+              close_price: exitCheck.currentPrice,
+              pnl_net: exitResult.pnlNet,
+              pnl_gross: exitResult.pnlNet + exitResult.takerFee + exitResult.gasFee,
+              taker_fee: exitResult.takerFee,
+              gas_fee: exitResult.gasFee,
+              bankroll_after: Math.round(bankroll * 100) / 100,
+              exit_reason: exitCheck.reason,
+              exit_price: exitCheck.currentPrice,
+              savings_vs_hold: Math.round(exitCheck.savingsVsHold * 100) / 100,
+            };
+            await sendTradeNotification(exitedTrade, settings);
+
+            results.push({
+              tradeId: trade.id,
+              market: trade.question,
+              status: `exited_early:${exitCheck.reason}`,
+              pnl: exitResult.pnlNet,
+            });
+
+            continue;  // Don't check resolution for this trade
+          }
+        }
+      }
+
+      // ===== NORMAL RESOLUTION CHECK =====
       // Check if market has resolved
       const resolution = await checkMarketResolution(trade.market_id);
 
@@ -39,8 +121,6 @@ export async function GET(req: NextRequest) {
 
       // If expired but no resolution data, check one more time with a delay
       if (isExpired && !resolution.resolved) {
-        // Mark as expired — we'll try again next tick
-        // If expired by more than 5 minutes, force-resolve based on last known state
         const minutesPastEnd = (Date.now() - endTime.getTime()) / (1000 * 60);
         if (minutesPastEnd < 5) {
           results.push({ tradeId: trade.id, market: trade.question, status: 'awaiting_resolution' });
@@ -57,6 +137,7 @@ export async function GET(req: NextRequest) {
         betAmount: trade.amount_usd,
         outcome,
         settings,
+        isMaker: trade.is_maker,
       });
 
       // Update bankroll: add back bet amount + net PnL
@@ -71,6 +152,8 @@ export async function GET(req: NextRequest) {
         gas_fee: sim.gasFee,
         pnl_net: sim.pnlNet,
         bankroll_after: Math.round(bankroll * 100) / 100,
+        is_maker: sim.isMaker,
+        maker_rebate: sim.makerRebate,
       });
 
       // Send notification for resolved trade
@@ -105,7 +188,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       status: 'ok',
-      resolved: results.filter(r => r.status === 'won' || r.status === 'lost').length,
+      resolved: results.filter(r => r.status === 'won' || r.status === 'lost' || r.status.startsWith('exited_early')).length,
       results,
     });
   } catch (error) {
