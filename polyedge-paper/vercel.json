@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/tick",
-      "schedule": "* * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/resolve",
-      "schedule": "* * * * *"
+      "schedule": "30 * * * *"
     },
     {
       "path": "/api/cron/research",
