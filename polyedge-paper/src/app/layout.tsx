@@ -18,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/settings" className="hover:text-blue-400">Settings</a>
               <a href="/trades" className="hover:text-blue-400">History</a>
               <a href="/research" className="hover:text-blue-400">Research</a>
+              <a href="/connections" className="hover:text-blue-400">APIs</a>
             </div>
           </div>
         </nav>
