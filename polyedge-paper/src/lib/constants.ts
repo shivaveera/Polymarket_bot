@@ -33,6 +33,38 @@ export const DEFAULT_SETTINGS = {
   no_exit_final_seconds: 60,
   // Circuit breaker (enhanced)
   circuit_breaker_enabled: true,
+  // Strategy D: Window Delta (THE primary signal)
+  window_delta_enabled: true,
+  // Strategy F: ADX Hard Gate (instant SKIP below 25)
+  adx_hard_gate_enabled: true,
+  // Strategy G: Momentum Cliff at 0.15%
+  momentum_cliff_enabled: true,
+  // Strategy H: Loss Signature Pattern Match
+  loss_signature_enabled: true,
+  // Strategy I: Regime-Aware Base Rate Tracking
+  regime_tracking_enabled: true,
+  regime_window: 50,
+  auto_pause_below_base_rate: 0.50,
+  // Strategy J: Trade Cooldown
+  cooldown_enabled: true,
+  // Strategy B: Flash Crash Buy
+  flash_crash_enabled: true,
+  flash_crash_drop_threshold: 0.15,
+  flash_crash_momentum_floor: -0.10,
+  flash_crash_size_multiplier: 1.4,
+  // Strategy C: Streak Reversal
+  streak_tracking_enabled: true,
+  streak_length: 5,
+  streak_penalty: -5,
+  streak_bonus: 3,
+  // Strategy E: Oracle Check
+  oracle_check_enabled: true,
+  oracle_divergence_threshold: 0.07,
+  // Strategy A: Endcycle Sniper
+  endcycle_sniper_enabled: true,
+  endcycle_min_price: 0.90,
+  endcycle_max_seconds: 30,
+  endcycle_size_multiplier: 0.2,
 };
 
 export const SHEETS = {

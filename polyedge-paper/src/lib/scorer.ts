@@ -1,4 +1,10 @@
 import { Signals, Settings } from '@/types';
+import {
+  scoreWindowDelta,
+  scoreMomentumCliff,
+  scoreStreakReversal,
+  checkOracleDivergence,
+} from './strategies';
 
 export interface ScoreBreakdown {
   total: number;
@@ -6,20 +12,70 @@ export interface ScoreBreakdown {
   components: Record<string, number>;
   conflicts: string[];
   confirmations: string[];
+  windowDeltaSkip: boolean;
+  windowDeltaSkipReason: string;
+}
+
+export interface ScorerContext {
+  // Current window context (Feature 3 from previous commit)
+  currentWindowYesPrice?: number;
+  currentWindowMinutesLeft?: number;
+  // Strategy D: Window Delta
+  windowDeltaPct?: number;
+  windowDeltaAvailable?: boolean;
+  // Strategy C: Streak Reversal
+  recentOutcomes?: ('YES' | 'NO')[];
+  // Strategy E: Oracle Check
+  oraclePrice?: number | null;
 }
 
 export function scoreSignals(
   signals: Signals,
   settings: Settings,
-  windowContext?: {
-    currentWindowYesPrice?: number;
-    currentWindowMinutesLeft?: number;
-  }
+  context?: ScorerContext,
 ): ScoreBreakdown {
   const components: Record<string, number> = {};
   const conflicts: string[] = [];
   const confirmations: string[] = [];
   let total = 0;
+  let windowDeltaSkip = false;
+  let windowDeltaSkipReason = '';
+
+  // ===== STRATEGY D: Window Delta (THE primary signal) =====
+  if (settings.window_delta_enabled && context?.windowDeltaAvailable && context.windowDeltaPct !== undefined) {
+    const wd = scoreWindowDelta(context.windowDeltaPct);
+    if (wd.skip) {
+      windowDeltaSkip = true;
+      windowDeltaSkipReason = wd.reason;
+    }
+    components.windowDelta = wd.score;
+    total += wd.score;
+    if (wd.score >= 10) {
+      confirmations.push(`Window delta ${context.windowDeltaPct.toFixed(3)}% — strong YES signal`);
+    }
+  }
+
+  // ===== STRATEGY G: Momentum Cliff (replaces old 5m momentum scoring) =====
+  if (settings.momentum_cliff_enabled) {
+    const mc = scoreMomentumCliff(signals.momentum5m);
+    components.momentumCliff = mc.score;
+    total += mc.score;
+    if (mc.label === 'CLIFF_BULL') {
+      confirmations.push(`Momentum cliff at ${signals.momentum5m.toFixed(3)}% — 96% YES zone`);
+    } else if (mc.label === 'BEARISH') {
+      conflicts.push(`Negative momentum ${signals.momentum5m.toFixed(3)}% — BEARISH`);
+    }
+  } else {
+    // Fallback: original 5m momentum scoring
+    if (signals.momentum5m > 0.05) {
+      components.momentum5m = Math.min(7, Math.round(signals.momentum5m / 0.05) * 2);
+    } else if (signals.momentum5m > 0) {
+      components.momentum5m = 2;
+    } else {
+      components.momentum5m = 0;
+    }
+    total += components.momentum5m || 0;
+  }
 
   // RSI(7) momentum signal: 0-7 points
   if (signals.rsi7 >= 55 && signals.rsi7 <= 75) {
@@ -34,16 +90,6 @@ export function scoreSignals(
   }
   total += components.rsi7;
 
-  // 5m Momentum: 0-7 points
-  if (signals.momentum5m > 0.05) {
-    components.momentum5m = Math.min(7, Math.round(signals.momentum5m / 0.05) * 2);
-  } else if (signals.momentum5m > 0) {
-    components.momentum5m = 2;
-  } else {
-    components.momentum5m = 0;
-  }
-  total += components.momentum5m;
-
   // 1m Momentum (confirm direction): 0-4 points
   if (signals.momentum1m > 0.02) {
     components.momentum1m = Math.min(4, Math.round(signals.momentum1m / 0.02) * 2);
@@ -55,10 +101,11 @@ export function scoreSignals(
   total += components.momentum1m;
 
   // ADX (trend strength): 0-5 points
+  // Note: ADX hard gate is handled in tick route, but we still score it
   if (signals.adx >= 20 && signals.adx <= 50) {
     components.adx = Math.min(5, Math.round((signals.adx - 15) / 7));
   } else if (signals.adx > 50) {
-    components.adx = 3; // Very strong, might reverse
+    components.adx = 3;
   } else {
     components.adx = 0;
   }
@@ -100,41 +147,58 @@ export function scoreSignals(
     components.chop = 0;
   }
 
-  // Current window signal adjustment
-  if (windowContext?.currentWindowYesPrice !== undefined &&
-      windowContext?.currentWindowMinutesLeft !== undefined) {
+  // ===== STRATEGY C: Streak Reversal =====
+  if (settings.streak_tracking_enabled && context?.recentOutcomes && context.recentOutcomes.length > 0) {
+    const streak = scoreStreakReversal({
+      recentOutcomes: context.recentOutcomes,
+      streakLength: settings.streak_length,
+      streakPenalty: settings.streak_penalty,
+      streakBonus: settings.streak_bonus,
+    });
+    if (streak.adjustment !== 0) {
+      components.streakReversal = streak.adjustment;
+      total += streak.adjustment;
+      if (streak.adjustment < 0) {
+        conflicts.push(streak.reason);
+      } else {
+        confirmations.push(streak.reason);
+      }
+    }
+  }
 
-    const cwYes = windowContext.currentWindowYesPrice;
-    const cwMinLeft = windowContext.currentWindowMinutesLeft;
+  // ===== STRATEGY E: Oracle Check =====
+  if (settings.oracle_check_enabled && context?.oraclePrice) {
+    const oracle = checkOracleDivergence({
+      binancePrice: signals.btcPrice,
+      oraclePrice: context.oraclePrice,
+      thresholdPct: settings.oracle_divergence_threshold,
+    });
+    if (oracle.divergent) {
+      components.oracleDivergence = oracle.penalty;
+      total += oracle.penalty;
+      conflicts.push(`Binance/Oracle divergence ${oracle.divergencePct.toFixed(3)}%`);
+    }
+  }
 
-    // STRONG mean-reversion signal:
-    // Current window YES > 0.95 means BTC moved hard up
+  // ===== Current window signal adjustment (from previous commit) =====
+  if (context?.currentWindowYesPrice !== undefined &&
+      context?.currentWindowMinutesLeft !== undefined) {
+
+    const cwYes = context.currentWindowYesPrice;
+    const cwMinLeft = context.currentWindowMinutesLeft;
+
     if (cwYes > 0.95) {
-      const penalty = -5;
-      components.currentWindowSignal = penalty;
-      total += penalty;
-      conflicts.push(
-        `Current window near-certain YES (${(cwYes * 100).toFixed(0)}%) — strong mean reversion risk`
-      );
-    }
-    // If current window is nearly decided (YES > 0.85 with < 5 min left)
-    else if (cwYes > 0.85 && cwMinLeft < 5) {
-      const penalty = -3;
-      components.currentWindowSignal = penalty;
-      total += penalty;
-      conflicts.push(
-        `Current window YES at ${(cwYes * 100).toFixed(0)}% — mean reversion risk for next window`
-      );
-    }
-    // If current window is nearly decided NO (YES < 0.15 with < 5 min left)
-    // BTC just dropped — bounce/recovery potential (slightly bullish for YES)
-    else if (cwYes < 0.15 && cwMinLeft < 5) {
-      const bonus = 1;
-      components.currentWindowSignal = bonus;
-      total += bonus;
-      confirmations.push(
-        `Current window bearish resolution — bounce potential for next window`
-      );
+      components.currentWindowSignal = -5;
+      total += -5;
+      conflicts.push(`Current window near-certain YES (${(cwYes * 100).toFixed(0)}%) — strong mean reversion risk`);
+    } else if (cwYes > 0.85 && cwMinLeft < 5) {
+      components.currentWindowSignal = -3;
+      total += -3;
+      conflicts.push(`Current window YES at ${(cwYes * 100).toFixed(0)}% — mean reversion risk`);
+    } else if (cwYes < 0.15 && cwMinLeft < 5) {
+      components.currentWindowSignal = 1;
+      total += 1;
+      confirmations.push(`Current window bearish — bounce potential`);
     } else {
       components.currentWindowSignal = 0;
     }
@@ -142,7 +206,7 @@ export function scoreSignals(
 
   total = Math.max(0, Math.min(35, total));
 
-  // Determine tier
+  // Determine tier (with regime adjustment applied externally in tick route)
   let tier: 'TIER1' | 'TIER2' | 'TIER3';
   if (total >= settings.tier1_threshold) {
     tier = 'TIER1';
@@ -152,5 +216,5 @@ export function scoreSignals(
     tier = 'TIER3';
   }
 
-  return { total, tier, components, conflicts, confirmations };
+  return { total, tier, components, conflicts, confirmations, windowDeltaSkip, windowDeltaSkipReason };
 }

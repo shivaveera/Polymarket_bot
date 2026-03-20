@@ -119,6 +119,58 @@ export async function getSettings(): Promise<Settings> {
     circuit_breaker_enabled: settings.circuit_breaker_enabled !== undefined
       ? settings.circuit_breaker_enabled === 'TRUE'
       : DEFAULT_SETTINGS.circuit_breaker_enabled,
+    // Strategy D: Window Delta
+    window_delta_enabled: settings.window_delta_enabled !== undefined
+      ? settings.window_delta_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.window_delta_enabled,
+    // Strategy F: ADX Hard Gate
+    adx_hard_gate_enabled: settings.adx_hard_gate_enabled !== undefined
+      ? settings.adx_hard_gate_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.adx_hard_gate_enabled,
+    // Strategy G: Momentum Cliff
+    momentum_cliff_enabled: settings.momentum_cliff_enabled !== undefined
+      ? settings.momentum_cliff_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.momentum_cliff_enabled,
+    // Strategy H: Loss Signature
+    loss_signature_enabled: settings.loss_signature_enabled !== undefined
+      ? settings.loss_signature_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.loss_signature_enabled,
+    // Strategy I: Regime Tracking
+    regime_tracking_enabled: settings.regime_tracking_enabled !== undefined
+      ? settings.regime_tracking_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.regime_tracking_enabled,
+    regime_window: parseInt(settings.regime_window) || DEFAULT_SETTINGS.regime_window,
+    auto_pause_below_base_rate: parseFloat(settings.auto_pause_below_base_rate) || DEFAULT_SETTINGS.auto_pause_below_base_rate,
+    // Strategy J: Trade Cooldown
+    cooldown_enabled: settings.cooldown_enabled !== undefined
+      ? settings.cooldown_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.cooldown_enabled,
+    // Strategy B: Flash Crash
+    flash_crash_enabled: settings.flash_crash_enabled !== undefined
+      ? settings.flash_crash_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.flash_crash_enabled,
+    flash_crash_drop_threshold: parseFloat(settings.flash_crash_drop_threshold) || DEFAULT_SETTINGS.flash_crash_drop_threshold,
+    flash_crash_momentum_floor: parseFloat(settings.flash_crash_momentum_floor) || DEFAULT_SETTINGS.flash_crash_momentum_floor,
+    flash_crash_size_multiplier: parseFloat(settings.flash_crash_size_multiplier) || DEFAULT_SETTINGS.flash_crash_size_multiplier,
+    // Strategy C: Streak Reversal
+    streak_tracking_enabled: settings.streak_tracking_enabled !== undefined
+      ? settings.streak_tracking_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.streak_tracking_enabled,
+    streak_length: parseInt(settings.streak_length) || DEFAULT_SETTINGS.streak_length,
+    streak_penalty: parseInt(settings.streak_penalty) || DEFAULT_SETTINGS.streak_penalty,
+    streak_bonus: parseInt(settings.streak_bonus) || DEFAULT_SETTINGS.streak_bonus,
+    // Strategy E: Oracle Check
+    oracle_check_enabled: settings.oracle_check_enabled !== undefined
+      ? settings.oracle_check_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.oracle_check_enabled,
+    oracle_divergence_threshold: parseFloat(settings.oracle_divergence_threshold) || DEFAULT_SETTINGS.oracle_divergence_threshold,
+    // Strategy A: Endcycle Sniper
+    endcycle_sniper_enabled: settings.endcycle_sniper_enabled !== undefined
+      ? settings.endcycle_sniper_enabled === 'TRUE'
+      : DEFAULT_SETTINGS.endcycle_sniper_enabled,
+    endcycle_min_price: parseFloat(settings.endcycle_min_price) || DEFAULT_SETTINGS.endcycle_min_price,
+    endcycle_max_seconds: parseInt(settings.endcycle_max_seconds) || DEFAULT_SETTINGS.endcycle_max_seconds,
+    endcycle_size_multiplier: parseFloat(settings.endcycle_size_multiplier) || DEFAULT_SETTINGS.endcycle_size_multiplier,
   };
 }
 

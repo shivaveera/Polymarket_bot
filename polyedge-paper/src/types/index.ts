@@ -33,6 +33,38 @@ export interface Settings {
   no_exit_final_seconds: number;
   // Circuit breaker (enhanced)
   circuit_breaker_enabled: boolean;
+  // Strategy D: Window Delta
+  window_delta_enabled: boolean;
+  // Strategy F: ADX Hard Gate
+  adx_hard_gate_enabled: boolean;
+  // Strategy G: Momentum Cliff
+  momentum_cliff_enabled: boolean;
+  // Strategy H: Loss Signature
+  loss_signature_enabled: boolean;
+  // Strategy I: Regime Tracking
+  regime_tracking_enabled: boolean;
+  regime_window: number;
+  auto_pause_below_base_rate: number;
+  // Strategy J: Trade Cooldown
+  cooldown_enabled: boolean;
+  // Strategy B: Flash Crash
+  flash_crash_enabled: boolean;
+  flash_crash_drop_threshold: number;
+  flash_crash_momentum_floor: number;
+  flash_crash_size_multiplier: number;
+  // Strategy C: Streak Reversal
+  streak_tracking_enabled: boolean;
+  streak_length: number;
+  streak_penalty: number;
+  streak_bonus: number;
+  // Strategy E: Oracle Check
+  oracle_check_enabled: boolean;
+  oracle_divergence_threshold: number;
+  // Strategy A: Endcycle Sniper
+  endcycle_sniper_enabled: boolean;
+  endcycle_min_price: number;
+  endcycle_max_seconds: number;
+  endcycle_size_multiplier: number;
 }
 
 export interface Candle {
