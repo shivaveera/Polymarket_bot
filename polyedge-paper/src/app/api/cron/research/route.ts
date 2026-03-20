@@ -6,6 +6,7 @@ import {
   getSettings,
 } from '@/lib/sheets';
 import { DailyStats } from '@/types';
+import { sendDailySummary } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 55;
@@ -97,6 +98,18 @@ export async function GET(req: NextRequest) {
     };
 
     await appendDailyStats(stats);
+
+    await sendDailySummary({
+      date: stats.date,
+      trades: total,
+      won,
+      lost,
+      winRate,
+      pnl: stats.pnl_net,
+      bankroll: stats.bankroll_end,
+      alpha: botAlpha,
+      regime,
+    }, settings);
 
     return NextResponse.json({ status: 'ok', stats });
   } catch (error) {

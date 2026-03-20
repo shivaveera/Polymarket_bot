@@ -40,6 +40,7 @@ interface StatsData {
     adx: number;
     volume_ratio: number;
     chop: boolean;
+    regime: string;
     ai_decision: string;
     ai_confidence: number;
     ai_reasoning: string;
@@ -103,6 +104,7 @@ interface StatsData {
     adx: number;
     volume_ratio: number;
     chop: boolean;
+    regime: string;
     ai_decision: string;
     ai_confidence: number;
     ai_reasoning: string;

@@ -172,6 +172,88 @@ export function SettingsForm() {
         </div>
       </div>
 
+      {/* Circuit Breaker */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Circuit Breaker</h3>
+        <div className="text-xs text-gray-400 mb-2">
+          Auto-pauses trading on loss streaks or drawdown. Sends alert via Telegram/Discord.
+        </div>
+        <SliderField
+          label="Max Consecutive Losses"
+          value={settings.max_consecutive_losses}
+          min={2} max={10} step={1}
+          onChange={v => save({ max_consecutive_losses: v })}
+        />
+        <SliderField
+          label="Max Drawdown %"
+          value={settings.max_drawdown_pct}
+          min={5} max={50} step={5}
+          format={v => `${v}%`}
+          onChange={v => save({ max_drawdown_pct: v })}
+        />
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Peak Bankroll</span>
+          <span className="font-mono">${settings.peak_bankroll.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold">Notifications</h3>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm">Telegram</span>
+            <button
+              onClick={() => save({ telegram_enabled: !settings.telegram_enabled })}
+              className={`px-3 py-1 rounded text-sm ${
+                settings.telegram_enabled ? 'bg-blue-600' : 'bg-gray-700'
+              }`}
+            >
+              {settings.telegram_enabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          {settings.telegram_enabled && (
+            <div className="space-y-2">
+              <TextInput
+                label="Bot Token"
+                value={settings.telegram_bot_token}
+                placeholder="123456:ABC-DEF..."
+                onChange={v => save({ telegram_bot_token: v })}
+              />
+              <TextInput
+                label="Chat ID"
+                value={settings.telegram_chat_id}
+                placeholder="-1001234567890"
+                onChange={v => save({ telegram_chat_id: v })}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-[#2a2a2a] pt-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm">Discord</span>
+            <button
+              onClick={() => save({ discord_enabled: !settings.discord_enabled })}
+              className={`px-3 py-1 rounded text-sm ${
+                settings.discord_enabled ? 'bg-blue-600' : 'bg-gray-700'
+              }`}
+            >
+              {settings.discord_enabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          {settings.discord_enabled && (
+            <TextInput
+              label="Webhook URL"
+              value={settings.discord_webhook_url}
+              placeholder="https://discord.com/api/webhooks/..."
+              onChange={v => save({ discord_webhook_url: v })}
+            />
+          )}
+        </div>
+      </div>
+
       {/* Fees */}
       <div className="card space-y-4">
         <h3 className="font-semibold">Simulation Fees</h3>
@@ -192,6 +274,33 @@ export function SettingsForm() {
       </div>
 
       {saving && <div className="text-gray-400 text-sm">Saving...</div>}
+    </div>
+  );
+}
+
+function TextInput({
+  label, value, placeholder, onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+}) {
+  const [local, setLocal] = useState(value);
+
+  useEffect(() => { setLocal(value); }, [value]);
+
+  return (
+    <div>
+      <div className="text-xs text-gray-400 mb-1">{label}</div>
+      <input
+        type="text"
+        value={local}
+        placeholder={placeholder}
+        onChange={e => setLocal(e.target.value)}
+        onBlur={() => { if (local !== value) onChange(local); }}
+        className="w-full bg-[#111] border border-[#333] rounded px-3 py-1.5 text-sm font-mono"
+      />
     </div>
   );
 }

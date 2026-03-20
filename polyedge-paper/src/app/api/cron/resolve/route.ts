@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkMarketResolution } from '@/lib/polymarket';
 import { simulateResolution } from '@/lib/simulator';
 import { getSettings, getOpenTrades, updateTradeResolution, updateSettings } from '@/lib/sheets';
+import { sendTradeNotification } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 55;
@@ -72,6 +73,20 @@ export async function GET(req: NextRequest) {
         bankroll_after: Math.round(bankroll * 100) / 100,
       });
 
+      // Send notification for resolved trade
+      const resolvedTrade = {
+        ...trade,
+        status: (outcome === 'YES' ? 'won' : 'lost') as 'won' | 'lost',
+        resolution: outcome,
+        close_price: sim.closePrice,
+        pnl_gross: sim.pnlGross,
+        pnl_net: sim.pnlNet,
+        taker_fee: sim.takerFee,
+        gas_fee: sim.gasFee,
+        bankroll_after: Math.round(bankroll * 100) / 100,
+      };
+      await sendTradeNotification(resolvedTrade, settings);
+
       results.push({
         tradeId: trade.id,
         market: trade.question,
@@ -80,8 +95,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Update bankroll in settings
-    await updateSettings({ bankroll: Math.round(bankroll * 100) / 100 });
+    // Update bankroll and peak in settings
+    const roundedBankroll = Math.round(bankroll * 100) / 100;
+    const updates: Record<string, number | boolean> = { bankroll: roundedBankroll };
+    if (roundedBankroll > settings.peak_bankroll) {
+      updates.peak_bankroll = roundedBankroll;
+    }
+    await updateSettings(updates);
 
     return NextResponse.json({
       status: 'ok',

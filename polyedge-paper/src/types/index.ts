@@ -13,6 +13,14 @@ export interface Settings {
   blackout_hours: number[];
   sim_gas_fee: number;
   sim_taker_fee_rate: number;
+  max_consecutive_losses: number;
+  max_drawdown_pct: number;
+  peak_bankroll: number;
+  telegram_enabled: boolean;
+  telegram_bot_token: string;
+  telegram_chat_id: string;
+  discord_enabled: boolean;
+  discord_webhook_url: string;
 }
 
 export interface Candle {
@@ -86,6 +94,7 @@ export interface Trade {
   adx: number;
   volume_ratio: number;
   chop: boolean;
+  regime: string;
   ai_decision: string;
   ai_confidence: number;
   ai_reasoning: string;

@@ -18,6 +18,7 @@ export function TradeHistory({ trades }: { trades: Trade[] }) {
             <th className="pb-2 pr-3">Amount</th>
             <th className="pb-2 pr-3">Tier</th>
             <th className="pb-2 pr-3">Score</th>
+            <th className="pb-2 pr-3">Regime</th>
             <th className="pb-2 pr-3">Status</th>
             <th className="pb-2 pr-3">PnL</th>
             <th className="pb-2">Fees</th>
@@ -44,6 +45,15 @@ export function TradeHistory({ trades }: { trades: Trade[] }) {
                 </span>
               </td>
               <td className="py-2 pr-3 font-mono">{trade.confidence_score}</td>
+              <td className="py-2 pr-3">
+                <span className={`text-xs ${
+                  trade.regime === 'bull' ? 'text-green-400' :
+                  trade.regime === 'bear' ? 'text-red-400' :
+                  'text-gray-400'
+                }`}>
+                  {trade.regime || '-'}
+                </span>
+              </td>
               <td className="py-2 pr-3">
                 <span className={
                   trade.status === 'won' ? 'text-green-400' :

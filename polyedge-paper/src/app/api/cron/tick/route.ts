@@ -13,7 +13,9 @@ import {
   appendTrade,
   appendObservation,
   updateSettings,
+  checkCircuitBreaker,
 } from '@/lib/sheets';
+import { sendTradeNotification, sendCircuitBreakerAlert } from '@/lib/notifications';
 import { Trade, Observation, Signals } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +33,14 @@ export async function GET(req: NextRequest) {
 
     if (!settings.trading_enabled) {
       return NextResponse.json({ status: 'paused', message: 'Trading disabled' });
+    }
+
+    // Circuit breaker check
+    const breaker = await checkCircuitBreaker(settings);
+    if (breaker.tripped) {
+      await updateSettings({ trading_enabled: false });
+      await sendCircuitBreakerAlert(breaker.reason, settings);
+      return NextResponse.json({ status: 'circuit_breaker', reason: breaker.reason });
     }
 
     // Check blackout hours (CST = UTC-6)
@@ -62,6 +72,9 @@ export async function GET(req: NextRequest) {
     if (markets.length === 0) {
       return NextResponse.json({ status: 'no_markets' });
     }
+
+    // Compute regime from 5m momentum
+    const regime = signals.momentum5m > 0.10 ? 'bull' : signals.momentum5m < -0.10 ? 'bear' : 'sideways';
 
     const results: { market: string; action: string; tradeId?: string }[] = [];
 
@@ -147,15 +160,22 @@ export async function GET(req: NextRequest) {
           adx: signals.adx,
           volume_ratio: signals.volumeRatio,
           chop: signals.chop,
+          regime,
           ai_decision: aiDecision,
           ai_confidence: aiConfidence,
           ai_reasoning: aiReasoning,
         };
 
         await appendTrade(trade);
+        await sendTradeNotification(trade, settings);
 
-        // Update bankroll
-        await updateSettings({ bankroll: settings.bankroll - betSize });
+        // Update bankroll and peak
+        const newBankroll = settings.bankroll - betSize;
+        const peakUpdate: Record<string, number | boolean> = { bankroll: newBankroll };
+        if (newBankroll > settings.peak_bankroll) {
+          peakUpdate.peak_bankroll = newBankroll;
+        }
+        await updateSettings(peakUpdate);
         settings.bankroll -= betSize;
 
         await logObservation(market.id, market.question, timeframe, market, signals, score, tier, true, tradeId, '');

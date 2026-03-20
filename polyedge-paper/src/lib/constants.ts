@@ -13,6 +13,14 @@ export const DEFAULT_SETTINGS = {
   blackout_hours: [22, 23, 0, 1, 2, 3],
   sim_gas_fee: 0.005,
   sim_taker_fee_rate: 0.01,
+  max_consecutive_losses: 3,
+  max_drawdown_pct: 20,
+  peak_bankroll: 20,
+  telegram_enabled: false,
+  telegram_bot_token: '',
+  telegram_chat_id: '',
+  discord_enabled: false,
+  discord_webhook_url: '',
 };
 
 export const SHEETS = {
@@ -30,7 +38,7 @@ export const TRADE_HEADERS = [
   'tier', 'confidence_score', 'status', 'resolution', 'close_price',
   'pnl_gross', 'taker_fee', 'gas_fee', 'pnl_net', 'bankroll_after',
   'btc_price', 'rsi7', 'momentum_5m', 'adx', 'volume_ratio', 'chop',
-  'ai_decision', 'ai_confidence', 'ai_reasoning',
+  'regime', 'ai_decision', 'ai_confidence', 'ai_reasoning',
 ];
 
 export const OBSERVATION_HEADERS = [

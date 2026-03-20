@@ -93,6 +93,14 @@ export async function getSettings(): Promise<Settings> {
       : DEFAULT_SETTINGS.blackout_hours,
     sim_gas_fee: parseFloat(settings.sim_gas_fee) || DEFAULT_SETTINGS.sim_gas_fee,
     sim_taker_fee_rate: parseFloat(settings.sim_taker_fee_rate) || DEFAULT_SETTINGS.sim_taker_fee_rate,
+    max_consecutive_losses: parseInt(settings.max_consecutive_losses) || DEFAULT_SETTINGS.max_consecutive_losses,
+    max_drawdown_pct: parseFloat(settings.max_drawdown_pct) || DEFAULT_SETTINGS.max_drawdown_pct,
+    peak_bankroll: parseFloat(settings.peak_bankroll) || DEFAULT_SETTINGS.peak_bankroll,
+    telegram_enabled: settings.telegram_enabled === 'TRUE',
+    telegram_bot_token: settings.telegram_bot_token || '',
+    telegram_chat_id: settings.telegram_chat_id || '',
+    discord_enabled: settings.discord_enabled === 'TRUE',
+    discord_webhook_url: settings.discord_webhook_url || '',
   };
 }
 
@@ -239,6 +247,36 @@ export async function getSignalWeights(): Promise<SignalWeight[]> {
   });
 }
 
+export async function checkCircuitBreaker(settings: Settings): Promise<{ tripped: boolean; reason: string }> {
+  const all = await getAllTrades();
+  const closed = all.filter(t => t.status === 'won' || t.status === 'lost');
+
+  // Check consecutive losses
+  if (closed.length >= settings.max_consecutive_losses) {
+    const recent = closed.slice(-settings.max_consecutive_losses);
+    const allLosses = recent.every(t => t.status === 'lost');
+    if (allLosses) {
+      return {
+        tripped: true,
+        reason: `${settings.max_consecutive_losses} consecutive losses`,
+      };
+    }
+  }
+
+  // Check drawdown from peak
+  const drawdownPct = settings.peak_bankroll > 0
+    ? ((settings.peak_bankroll - settings.bankroll) / settings.peak_bankroll) * 100
+    : 0;
+  if (drawdownPct >= settings.max_drawdown_pct) {
+    return {
+      tripped: true,
+      reason: `Drawdown ${drawdownPct.toFixed(1)}% exceeds ${settings.max_drawdown_pct}% max (peak: $${settings.peak_bankroll.toFixed(2)}, current: $${settings.bankroll.toFixed(2)})`,
+    };
+  }
+
+  return { tripped: false, reason: '' };
+}
+
 export async function getTradesInLastHour(): Promise<number> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const trades = await getTradesSince(oneHourAgo);
@@ -277,6 +315,7 @@ function rowToTrade(headers: string[], row: string[]): Trade {
     adx: parseFloat(obj.adx) || 0,
     volume_ratio: parseFloat(obj.volume_ratio) || 0,
     chop: obj.chop === 'TRUE',
+    regime: obj.regime || '',
     ai_decision: obj.ai_decision,
     ai_confidence: parseFloat(obj.ai_confidence) || 0,
     ai_reasoning: obj.ai_reasoning,
@@ -290,7 +329,7 @@ function tradeToRow(t: Trade): (string | number | boolean)[] {
     t.tier, t.confidence_score, t.status, t.resolution, t.close_price,
     t.pnl_gross, t.taker_fee, t.gas_fee, t.pnl_net, t.bankroll_after,
     t.btc_price, t.rsi7, t.momentum_5m, t.adx, t.volume_ratio,
-    t.chop ? 'TRUE' : 'FALSE', t.ai_decision, t.ai_confidence, t.ai_reasoning,
+    t.chop ? 'TRUE' : 'FALSE', t.regime, t.ai_decision, t.ai_confidence, t.ai_reasoning,
   ];
 }
 
