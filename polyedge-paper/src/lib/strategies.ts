@@ -101,7 +101,7 @@ export function scoreMomentumCliff(momentum5m: number): { score: number; label: 
   if (momentum5m > 0) {
     return { score: 3, label: 'WEAK_BULL' };     // marginal, looks bullish but 47% WR
   }
-  return { score: -10, label: 'BEARISH' };        // don't touch
+  return { score: -5, label: 'BEARISH' };           // penalty, but not extreme
 }
 
 // ===== STRATEGY C: Streak Reversal =====
@@ -329,10 +329,16 @@ export function runHardGates(params: {
     if (cooldown.skip) return cooldown;
   }
 
-  // Gate 3: Loss Signature
-  if (settings.loss_signature_enabled) {
+  // Gate 3: Loss Signature (skip if ADX gate is enabled — they overlap on ADX < 25)
+  if (settings.loss_signature_enabled && !settings.adx_hard_gate_enabled) {
     const lossSig = checkLossSignature(signals);
     if (lossSig.skip) return { skip: true, reason: lossSig.reason };
+  } else if (settings.loss_signature_enabled && settings.adx_hard_gate_enabled) {
+    // ADX gate already passed, so only check remaining loss signature conditions
+    // (negative momentum + compressed BB, since ADX is already > 25)
+    if (signals.momentum5m < 0 && signals.bbWidth < 0.50) {
+      return { skip: true, reason: 'loss_signature_match(neg_momentum+compressed_bb)' };
+    }
   }
 
   // Gate 4: Regime auto-pause
@@ -340,7 +346,12 @@ export function runHardGates(params: {
     return { skip: true, reason: `regime_pause(base_rate=${(regimeBaseRate || 0).toFixed(2)})` };
   }
 
-  // Gate 5: Final 60s of window — skip (let endcycle handle it if enabled)
+  // Gate 5: Absorption detected — institutional activity, skip
+  if (signals.absorption) {
+    return { skip: true, reason: 'absorption_detected' };
+  }
+
+  // Gate 6: Final 60s of window — skip (let endcycle handle it if enabled)
   if (secondsUntilEnd < 60 && !settings.endcycle_sniper_enabled) {
     return { skip: true, reason: 'final_60s_of_window' };
   }

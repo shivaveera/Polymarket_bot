@@ -13,14 +13,44 @@ import { Settings } from '@/types';
  * where timestamp aligns to every 300 seconds
  */
 
+/**
+ * Get the current ET (Eastern Time) offset in seconds.
+ * ET is UTC-5 (EST) or UTC-4 (EDT during DST).
+ * DST: second Sunday in March to first Sunday in November.
+ */
+function getETOffsetSeconds(): number {
+  const now = new Date();
+  const jan = new Date(now.getFullYear(), 0, 1);
+  const jul = new Date(now.getFullYear(), 6, 1);
+  const stdOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+  // Use a trick: create a date in ET and check if DST is active
+  const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const utcNow = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const diffMs = utcNow.getTime() - etNow.getTime();
+  return Math.round(diffMs / 1000);
+}
+
+/**
+ * Align timestamps to ET boundaries for Polymarket windows.
+ * Polymarket 15m windows align to :00/:15/:30/:45 ET.
+ * 5m windows align to every 300 seconds in ET.
+ */
+function alignToET(nowUnix: number, intervalSeconds: number): number {
+  const etOffset = getETOffsetSeconds();
+  // Convert to ET-relative time, align, then convert back
+  const etTime = nowUnix - etOffset;
+  const aligned = etTime - (etTime % intervalSeconds);
+  return aligned + etOffset;
+}
+
 export function getNextWindowTimestamp(
   timeframeMinutes: number
 ): { start: number; end: number; slug: string } {
   const now = Math.floor(Date.now() / 1000);
   const interval = timeframeMinutes * 60;
 
-  // Current window start
-  const currentStart = now - (now % interval);
+  // Align to ET boundaries (Polymarket uses Eastern Time)
+  const currentStart = alignToET(now, interval);
   // Next window start
   const nextStart = currentStart + interval;
   const nextEnd = nextStart + interval;
@@ -33,7 +63,7 @@ export function getNextWindowTimestamp(
 export function getCurrentWindowSlug(timeframeMinutes: number): string {
   const now = Math.floor(Date.now() / 1000);
   const interval = timeframeMinutes * 60;
-  const currentStart = now - (now % interval);
+  const currentStart = alignToET(now, interval);
   return `btc-updown-${timeframeMinutes}m-${currentStart}`;
 }
 

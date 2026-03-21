@@ -100,7 +100,7 @@ export default function ResearchPage() {
       <div className="card">
         <h3 className="text-sm font-semibold text-gray-400 mb-2">NOTES</h3>
         <ul className="text-sm text-gray-300 space-y-1 list-disc list-inside">
-          <li>Daily research runs at 6:00 UTC via /api/cron/research</li>
+          <li>Daily research runs via /api/cron/research (see vercel.json for schedule)</li>
           <li>Alpha = Bot Win Rate - Base YES Resolution Rate</li>
           <li>Positive alpha means the bot is picking better than random</li>
           <li>Regime is estimated from average 5m momentum of traded periods</li>

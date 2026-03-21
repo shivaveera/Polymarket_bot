@@ -19,7 +19,7 @@ import {
   getPreOrderBySlug,
   updatePreOrderStatus,
   getObservationsSince,
-  getAllTrades,
+  getRecentTrades,
 } from '@/lib/sheets';
 import { sendTradeNotification, sendCircuitBreakerAlert } from '@/lib/notifications';
 import { Trade, Observation, Signals, PreOrder } from '@/types';
@@ -78,9 +78,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: 'max_open', open: openTrades.length });
     }
 
-    // Fetch BTC candles and compute signals
-    const candles = await fetchCandles('BTCUSDT', '1m', 100);
-    const signals = computeSignals(candles);
+    // Fetch BTC candles and compute signals (200 candles for reliable window delta)
+    let candles;
+    let signals;
+    try {
+      candles = await fetchCandles('BTCUSDT', '1m', 200);
+      signals = computeSignals(candles);
+    } catch (binanceError) {
+      console.error('Binance API error:', binanceError);
+      return NextResponse.json({ status: 'error', reason: 'binance_api_error', error: String(binanceError) });
+    }
 
     // Fetch active BTC markets from Polymarket
     const markets = await fetchBTCMarkets();
@@ -92,7 +99,9 @@ export async function GET(req: NextRequest) {
     // ===== STRATEGY I: Regime tracking =====
     let regimeData: { baseRate: number; regime: 'MILD_BULL' | 'BEARISH' | 'STRONG_BULL' | 'NEUTRAL'; shouldPause: boolean; tier1Adjustment: number } = { baseRate: 0.80, regime: 'MILD_BULL', shouldPause: false, tier1Adjustment: 0 };
     if (settings.regime_tracking_enabled) {
-      const recentObs = await getObservationsSince(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+      // Only fetch last 24h of observations for regime (not 7 days)
+      // regime_window setting controls the rolling window size
+      const recentObs = await getObservationsSince(new Date(Date.now() - 24 * 60 * 60 * 1000));
       const outcomeObs = recentObs
         .filter(o => o.market_outcome === 'YES' || o.market_outcome === 'NO')
         .map(o => o.market_outcome as 'YES' | 'NO');
@@ -135,9 +144,9 @@ export async function GET(req: NextRequest) {
     // ===== STRATEGY J: Get last trade time for cooldown =====
     let lastTradeTime: string | null = null;
     if (settings.cooldown_enabled) {
-      const allTrades = await getAllTrades();
-      if (allTrades.length > 0) {
-        lastTradeTime = allTrades[allTrades.length - 1].timestamp;
+      const recentTrades = await getRecentTrades(5);
+      if (recentTrades.length > 0) {
+        lastTradeTime = recentTrades[recentTrades.length - 1].timestamp;
       }
     }
 
@@ -271,13 +280,17 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      if (market.yesPrice > settings.entry_price_max) {
+      // Check entry price max - but allow endcycle sniper to bypass
+      const endTime = new Date(market.endDate).getTime();
+      const secondsUntilEnd = (endTime - Date.now()) / 1000;
+      const isEndcycleCandidate = settings.endcycle_sniper_enabled &&
+        secondsUntilEnd <= settings.endcycle_max_seconds && secondsUntilEnd > 5 &&
+        market.yesPrice >= settings.endcycle_min_price;
+
+      if (market.yesPrice > settings.entry_price_max && !isEndcycleCandidate) {
         await logObservation(market.id, market.question, timeframe, market, signals, 0, 'TIER3', false, '', `Price too high: ${market.yesPrice}`, 0, 0);
         continue;
       }
-
-      const endTime = new Date(market.endDate).getTime();
-      const secondsUntilEnd = (endTime - Date.now()) / 1000;
 
       // Count open trades for this specific timeframe
       const openTradesForTimeframe = openTrades.filter(

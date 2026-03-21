@@ -57,9 +57,11 @@ export function scoreSignals(
 
   // ===== STRATEGY G: Momentum Cliff (replaces old 5m momentum scoring) =====
   if (settings.momentum_cliff_enabled) {
+    // Reduce weight when window delta is also enabled (they're correlated)
     const mc = scoreMomentumCliff(signals.momentum5m);
-    components.momentumCliff = mc.score;
-    total += mc.score;
+    const mcScore = settings.window_delta_enabled ? Math.round(mc.score * 0.5) : mc.score;
+    components.momentumCliff = mcScore;
+    total += mcScore;
     if (mc.label === 'CLIFF_BULL') {
       confirmations.push(`Momentum cliff at ${signals.momentum5m.toFixed(3)}% — 96% YES zone`);
     } else if (mc.label === 'BEARISH') {
@@ -101,15 +103,19 @@ export function scoreSignals(
   total += components.momentum1m;
 
   // ADX (trend strength): 0-5 points
-  // Note: ADX hard gate is handled in tick route, but we still score it
-  if (signals.adx >= 20 && signals.adx <= 50) {
-    components.adx = Math.min(5, Math.round((signals.adx - 15) / 7));
-  } else if (signals.adx > 50) {
-    components.adx = 3;
+  // Skip ADX scoring when hard gate is enabled (all trades already have ADX > 25)
+  if (!settings.adx_hard_gate_enabled) {
+    if (signals.adx >= 20 && signals.adx <= 50) {
+      components.adx = Math.min(5, Math.round((signals.adx - 15) / 7));
+    } else if (signals.adx > 50) {
+      components.adx = 3;
+    } else {
+      components.adx = 0;
+    }
+    total += components.adx;
   } else {
     components.adx = 0;
   }
-  total += components.adx;
 
   // Volume ratio: 0-4 points
   if (signals.volumeRatio >= 1.2) {
@@ -135,8 +141,8 @@ export function scoreSignals(
   }
   total += components.vwapDistance;
 
-  // Absorption bonus: 0-2 points
-  components.absorption = signals.absorption ? 2 : 0;
+  // Absorption penalty: detected absorption means institutional activity, skip signal
+  components.absorption = signals.absorption ? -5 : 0;
   total += components.absorption;
 
   // Chop penalty: -5 points
@@ -204,7 +210,7 @@ export function scoreSignals(
     }
   }
 
-  total = Math.max(0, Math.min(35, total));
+  total = Math.max(0, Math.min(50, total));
 
   // Determine tier (with regime adjustment applied externally in tick route)
   let tier: 'TIER1' | 'TIER2' | 'TIER3';

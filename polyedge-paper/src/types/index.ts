@@ -138,7 +138,7 @@ export interface Trade {
   adx: number;
   volume_ratio: number;
   chop: boolean;
-  regime: string;
+  regime: 'bull' | 'bear' | 'sideways' | '';
   ai_decision: string;
   ai_confidence: number;
   ai_reasoning: string;

@@ -13,10 +13,15 @@ export async function fetchBTCMarkets(): Promise<PolymarketMarket[]> {
   const markets: PolymarketMarket[] = [];
 
   for (const m of data) {
-    const question = (m.question || '').toLowerCase();
-    // Filter for BTC price up/down markets
-    if (!question.includes('btc') && !question.includes('bitcoin')) continue;
-    if (!question.includes('above') && !question.includes('below') && !question.includes('up') && !question.includes('down')) continue;
+    // Filter by deterministic slug pattern for BTC up/down markets
+    const slug = m.slug || '';
+    const slugPattern = /^btc-updown-(5|15)m-\d+$/;
+    if (!slugPattern.test(slug)) {
+      // Fallback: keyword matching for markets without standard slugs
+      const question = (m.question || '').toLowerCase();
+      if (!question.includes('btc') && !question.includes('bitcoin')) continue;
+      if (!question.includes('above') && !question.includes('below') && !question.includes('up') && !question.includes('down')) continue;
+    }
 
     const endDate = m.endDate || m.end_date_iso || '';
     if (!endDate) continue;
@@ -99,6 +104,11 @@ export async function checkMarketResolution(marketId: string): Promise<{
 }
 
 export function getTimeframeFromMarket(market: PolymarketMarket): number {
+  // Parse timeframe from slug first (deterministic)
+  const match = market.slug?.match(/(\d+)m-/);
+  if (match) return parseInt(match[1]);
+
+  // Fallback to time-based estimate
   const endTime = new Date(market.endDate).getTime();
   const now = Date.now();
   const minutesUntilEnd = (endTime - now) / (1000 * 60);

@@ -482,7 +482,7 @@ function rowToTrade(headers: string[], row: string[]): Trade {
     adx: parseFloat(obj.adx) || 0,
     volume_ratio: parseFloat(obj.volume_ratio) || 0,
     chop: obj.chop === 'TRUE',
-    regime: obj.regime || '',
+    regime: (obj.regime || '') as Trade['regime'],
     ai_decision: obj.ai_decision,
     ai_confidence: parseFloat(obj.ai_confidence) || 0,
     ai_reasoning: obj.ai_reasoning,

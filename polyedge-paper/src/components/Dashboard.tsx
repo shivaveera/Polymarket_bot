@@ -40,7 +40,7 @@ interface StatsData {
     adx: number;
     volume_ratio: number;
     chop: boolean;
-    regime: string;
+    regime: 'bull' | 'bear' | 'sideways' | '';
     ai_decision: string;
     ai_confidence: number;
     ai_reasoning: string;
@@ -80,7 +80,7 @@ interface StatsData {
     base_yes_rate: number;
     bot_alpha: number;
     observations: number;
-    regime: string;
+    regime: 'bull' | 'bear' | 'sideways' | '';
     best_signal: string;
   }>;
   recentTrades: Array<{
@@ -111,7 +111,7 @@ interface StatsData {
     adx: number;
     volume_ratio: number;
     chop: boolean;
-    regime: string;
+    regime: 'bull' | 'bear' | 'sideways' | '';
     ai_decision: string;
     ai_confidence: number;
     ai_reasoning: string;
@@ -236,7 +236,7 @@ export function Dashboard() {
       {/* Key Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <BankrollCard bankroll={stats.bankroll} todayPnl={stats.today.pnl} />
-        <WinRateCard winRate={stats.allTime.winRate} totalTrades={stats.allTime.totalTrades} />
+        <WinRateCard winRate={stats.allTime.winRate} totalTrades={stats.allTime.totalTrades} alpha={stats.dailyStats.length > 0 ? stats.dailyStats.reduce((sum, d) => sum + d.bot_alpha, 0) / stats.dailyStats.length : undefined} />
         <div className="card">
           <div className="text-sm text-gray-400">Today</div>
           <div className="text-2xl font-bold">{stats.today.trades}</div>

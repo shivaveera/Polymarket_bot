@@ -15,6 +15,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Re-read settings fresh to avoid race condition with tick route
+    // Both tick and resolve modify bankroll - resolve always reads latest
     const settings = await getSettings();
     const openTrades = await getOpenTrades();
 
@@ -33,7 +35,8 @@ export async function GET(req: NextRequest) {
     }
 
     const results: { tradeId: string; market: string; status: string; pnl?: number }[] = [];
-    let bankroll = settings.bankroll;
+    // Re-read bankroll right before modifications to minimize race window with tick
+    let bankroll = (await getSettings()).bankroll;
 
     for (const { trade, rowIndex } of openTrades) {
       // ===== EARLY EXIT CHECK =====
